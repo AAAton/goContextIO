@@ -50,8 +50,7 @@ func NewContextIO(key, secret string) *ContextIO {
 
 var apiHost = flag.String("apiHost", "api.context.io", "Use a specific host for the API")
 
-// NewRequest generates a request and signs it
-func (c *ContextIO) NewRequest(method, q string, queryParams url.Values, body io.Reader) (req *http.Request, err error) {
+func (c *ContextIO) NewRequest(method, q string, queryParams, postParams url.Values) (req *Request, err error) {
 	// make sure q has a slash in front of it
 	if q[0:1] != "/" {
 		q = "/" + q
@@ -61,34 +60,19 @@ func (c *ContextIO) NewRequest(method, q string, queryParams url.Values, body io
 	if len(queryParams) > 0 {
 		query = query + "?" + queryParams.Encode()
 	}
-	req, err = http.NewRequest(method, "https://"+query, body)
+	req = &Request{
+		C:          c,
+		Query:      q,
+		Attachment: "",
+	}
+	req.Request, err = http.NewRequest(method, "https://"+query, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.URL.Opaque = q
-	req.Header.Set("User-Agent", "GoContextIO Simple Library v. 0.1")
-
-	v := url.Values{}
-	switch method {
-	case "PUT", "POST", "DELETE":
-		// need form data here if uploading
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		var b []byte
-		b, err = ioutil.ReadAll(body)
-		if err != nil {
-			return nil, err
-		}
-		v, err = url.ParseQuery(string(b))
-		if err != nil {
-			return
-		}
-	}
-
-	err = c.client.SetAuthorizationHeader(req.Header, nil, req.Method, req.URL, v)
-	if err != nil {
-		return
-	}
-	return req, nil
+	req.SetUserAgent("GoContextIO Simple Library v. 0.1")
+	err = req.Sign()
+	return req, err
 }
 
 // AttachFile will create a file upload in the request, assumes NewRequest has already been called
@@ -129,21 +113,36 @@ func (c *ContextIO) AttachFile(req *http.Request, fieldName, fileName string) er
 // Do signs the request and returns an *http.Response. The body is a standard response.Body
 // and must have defer response.Body.close().  Does not support uploads, use NewRequest and AttachFile for that.
 // This is 2 legged authentication, and will not currently work with 3 legged authentication.
-func (c *ContextIO) Do(method, q string, params url.Values, body *string) (response *http.Response, err error) {
-	req, err := c.NewRequest(method, q, params, bytes.NewBufferString(*body))
+func (c *ContextIO) Do(method, q string, queryParams, postParams url.Values) (response *http.Response, err error) {
+	req, err := c.NewRequest(method, q, queryParams, postParams)
 	if err != nil {
 		return nil, err
 	}
-	return http.DefaultClient.Do(req)
+	return http.DefaultClient.Do(req.Request)
 }
 
 // DoJSON passes the request to Do and then returns the json in a []byte array
-func (c *ContextIO) DoJSON(method, q string, params url.Values, body *string) (json []byte, err error) {
-	response, err := c.Do(method, q, params, body)
+func (c *ContextIO) DoJSON(method, q string, queryParams, postParams url.Values, body *string) (json []byte, err error) {
+	response, err := c.Do(method, q, queryParams, postParams)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
 	json, err = ioutil.ReadAll(response.Body)
 	return json, err
+}
+
+type Request struct {
+	*http.Request
+	C          *ContextIO
+	Query      string
+	Attachment string
+}
+
+func (r *Request) SetUserAgent(ua string) {
+	r.Header.Set("User-Agent", ua)
+}
+
+func (r *Request) Sign() error {
+	return r.C.client.SetAuthorizationHeader(r.Header, nil, r.Method, r.URL, r.PostForm)
 }

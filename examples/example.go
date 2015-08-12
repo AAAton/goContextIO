@@ -23,7 +23,7 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Print extra information about the request")
 	key := flag.String("key", "", "Your CIO User Key")
 	secret := flag.String("secret", "", "Your CIO User Secret")
-	body := flag.String("body", "", `The body of the request, ignored if method is not a POST/PUT, POST parameters should be url.QueryEscape'ed in here, not in the [query string]`)
+	post := flag.String("post", "", `POST fields added to the request, make sure that your query string keys and values are properly escaped, such as with url.QueryEscape`)
 	flag.Parse()
 	c := contextio.NewContextIO(*key, *secret)
 	if len(flag.Args()) < 2 {
@@ -38,7 +38,10 @@ func main() {
 	if err != nil {
 		fmt.Printf("Unable to parse query string %s: %v\n", q, err)
 	}
-	resp, err := c.Do(m, q, params, body)
+	if post != nil {
+	} else {
+		resp, err := c.Do(m, q, params, body)
+	}
 	if err != nil {
 		fmt.Println("Request Error:", err)
 		os.Exit(1)
