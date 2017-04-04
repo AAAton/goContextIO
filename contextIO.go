@@ -9,7 +9,6 @@ package contextio
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,10 +24,8 @@ import (
 
 const (
 	defaultMaxMemory = 32 << 21 // 64 MB
+	defaultAPIHost   = "api.context.io"
 )
-
-// FIXME:  Libraries shouldn't use flags
-var defaultApiHost = flag.String("apiHost", "api.context.io", "Use a specific host for the API")
 
 // ContextIO is a struct containing the authentication information and a pointer to the oauth client
 type ContextIO struct {
@@ -37,7 +34,7 @@ type ContextIO struct {
 	rate        time.Duration
 	lastRequest time.Time
 	client      *oauth.Client
- 	apiHost string
+	apiHost     string
 }
 
 // NewContextIO returns a ContextIO struct based on your CIO User and Secret.
@@ -53,7 +50,7 @@ func NewContextIO(key, secret string) *ContextIO {
 		key:     key,
 		secret:  secret,
 		client:  c,
-		apiHost: *defaultApiHost,
+		apiHost: defaultAPIHost,
 	}
 }
 
